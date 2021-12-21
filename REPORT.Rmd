@@ -1,0 +1,583 @@
+---
+title: "Cyclistic bike share analysis"
+author: "Carlos Vasquez"
+date: "09/20/2021"
+output: html_document
+---
+
+=====================
+# STEP 1: Set up my environment
+# =====================
+
+Load library packages and upload the previous 12 months (from time of date,9/20/2021) [divvy-tripdata](https://divvy-tripdata.s3.amazonaws.com/index.html) sets.
+
+```{r loading packages, message = FALSE, warning = FALSE, error = FALSE}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(scales)
+```
+
+```{r loading divvy-trip data sets, message = FALSE}
+q9_2020 <- read_csv("202009-divvy-tripdata.csv")
+q10_2020 <- read_csv("202010-divvy-tripdata.csv")
+q11_2020 <- read_csv("202011-divvy-tripdata.csv")
+q12_2020 <- read_csv("202012-divvy-tripdata.csv")
+q1_2021 <- read_csv("202101-divvy-tripdata.csv")
+q2_2021 <- read_csv("202102-divvy-tripdata.csv")
+q3_2021 <- read_csv("202103-divvy-tripdata.csv")
+q4_2021 <- read_csv("202104-divvy-tripdata.csv")
+q5_2021 <- read_csv("202105-divvy-tripdata.csv")
+q6_2021 <- read_csv("202106-divvy-tripdata.csv")
+q7_2021 <- read_csv("202107-divvy-tripdata.csv")
+q8_2021 <- read_csv("202108-divvy-tripdata.csv")
+
+```
+=====================
+# STEP 2. Make columns consistent and merge them into a single dataframe.
+# =====================
+
+Use colnames function to compare the column names of each data set
+
+```{r Compare column names, message=FALSE}
+#Note all column names were the same but I was unable to merge.
+colnames(q9_2020)
+#colnames(q10_2020)
+#colnames(q11_2020)
+#colnames(q12_2020)
+#colnames(q1_2021)
+#colnames(q2_2021)
+#colnames(q3_2021)
+#colnames(q4_2021)
+#colnames(q5_2021)
+#colnames(q6_2021)
+#colnames(q7_2021)
+#colnames(q8_2021)
+
+```
+Look for inconsistent data types
+```{r Compare data types,message=FALSE}
+#inconsistent data type 
+sapply(q9_2020,class)
+#inconsistent data type 
+sapply(q10_2020,class)
+#inconsistent data type 
+sapply(q11_2020,class)
+#Observe start_station and end_station data type in a consistent data set
+sapply(q12_2020,class)
+#consistent data sets
+#sapply(q1_2021,class)
+#sapply(q2_2021,class)
+#sapply(q3_2021,class)
+#sapply(q4_2021,class)
+#sapply(q5_2021,class)
+#sapply(q6_2021,class)
+#sapply(q7_2021,class)
+#sapply(q8_2021,class)
+ 
+```
+Mutate data type to make all columns consistent for merging
+```{r mutate data type in start_station and end_station_id}
+q9_2020 <- mutate(q9_2020, start_station_id = as.character(start_station_id))
+q10_2020 <- mutate(q10_2020, start_station_id = as.character(start_station_id))
+q11_2020 <- mutate(q11_2020, start_station_id = as.character(start_station_id))
+q9_2020 <- mutate(q9_2020, end_station_id = as.character(end_station_id))
+q10_2020 <- mutate(q10_2020, end_station_id = as.character(end_station_id))
+q11_2020 <- mutate(q11_2020, end_station_id = as.character(end_station_id))
+```
+Merge into one data frame
+```{r Stack data frames}
+bike_rides <- bind_rows(q9_2020, q10_2020, q11_2020, q12_2020, q1_2021, q2_2021, q3_2021, q4_2021, q5_2021, q6_2021, q7_2021, q8_2021)
+
+```
+
+=====================
+# STEP 3. Prepare data for analysis
+# =====================
+
+Inspect the new data frame
+```{r view the number of rows and columns}
+dim(bike_rides)
+```
+Create minutes (ride length) column by subtracting ended_at column from started_at column.
+```{r}
+bike_rides$minutes <- difftime(bike_rides$ended_at,bike_rides$started_at,units = c("min"))
+bike_rides$minutes <-  as.numeric(as.character(bike_rides$minutes))
+bike_rides$minutes <- round(bike_rides$minutes, digits = 1)#round to tenth decimal place
+```
+Create columns for:  month, day, year, day of week, and hour.
+```{r}
+bike_rides$date <- as.Date(bike_rides$started_at)
+bike_rides$month <- format(as.Date(bike_rides$date), "%m")
+bike_rides$day <- format(as.Date(bike_rides$date), "%d")
+bike_rides$year <- format(as.Date(bike_rides$date), "%Y")
+bike_rides$day_of_week <- format(as.Date(bike_rides$date), "%A")
+bike_rides$hour <- lubridate::hour(bike_rides$started_at)
+```
+Double check newly converted data types
+```{r Check newly converted data types}
+is.numeric(bike_rides$minutes)
+is.Date(bike_rides$date)
+```
+Use mutate function to create:
+season (Spring, Summer, Fall, Winter) column
+```{r}
+bike_rides <-bike_rides %>% mutate(season = 
+                                             case_when(month == "03" ~ "Spring",
+                                                       month == "04" ~ "Spring",
+                                                       month == "05" ~ "Spring",
+                                                       month == "06"  ~ "Summer",
+                                                       month == "07"  ~ "Summer",
+                                                       month == "08"  ~ "Summer",
+                                                       month == "09" ~ "Fall",
+                                                       month == "10" ~ "Fall",
+                                                       month == "11" ~ "Fall",
+                                                       month == "12" ~ "Winter",
+                                                       month == "01" ~ "Winter",
+                                                       month == "02" ~ "Winter"))
+
+```
+time_of_day (Night, Morning, Afternoon, Evening,) and
+```{r}
+bike_rides <-bike_rides %>% mutate(time_of_day = 
+                                             case_when(hour == "0" ~ "Night",
+                                                       hour == "1" ~ "Night",
+                                                       hour == "2" ~ "Night",
+                                                       hour == "3" ~ "Night",
+                                                       hour == "4" ~ "Night",
+                                                       hour == "5" ~ "Night",
+                                                       hour == "6" ~ "Morning",
+                                                       hour == "7" ~ "Morning",
+                                                       hour == "8" ~ "Morning",
+                                                       hour == "9" ~ "Morning",
+                                                       hour == "10" ~ "Morning",
+                                                       hour == "11" ~ "Morning",
+                                                       hour == "12" ~ "Afternoon",
+                                                       hour == "13" ~ "Afternoon",
+                                                       hour == "14" ~ "Afternoon",
+                                                       hour == "15" ~ "Afternoon",
+                                                       hour == "16" ~ "Afternoon",
+                                                       hour == "17" ~ "Afternoon",
+                                                       hour == "18" ~ "Evening",
+                                                       hour == "19" ~ "Evening",
+                                                       hour == "20" ~ "Evening",
+                                                       hour == "21" ~ "Evening",
+                                                       hour == "22" ~ "Evening",
+                                                       hour == "23" ~ "Evening"))
+
+```
+to mutate the month column to display the full month name.
+```{r}
+bike_rides <-bike_rides %>% mutate(month = case_when(month == "01" ~ "January",
+                                                       month == "02" ~ "February",
+                                                       month == "03" ~ "March",
+                                                       month == "04" ~ "April",
+                                                       month == "05" ~ "May",
+                                                       month == "06" ~ "June",
+                                                       month == "07" ~ "July",
+                                                       month == "08" ~ "August",
+                                                       month == "09" ~ "September",
+                                                       month == "10" ~ "October",
+                                                       month == "11" ~ "November",
+                                                       month == "12" ~ "December"))
+
+```
+
+=====================
+# STEP 5. Clean the data
+# =====================
+
+Note: Business task: How do annual members and casual riders use Cyclistic bikes differently? Since our analyses is focusing on casual vs member riders let ensure our data reflects this.
+```{r check unique categories in member_casual column}
+ unique(bike_rides$member_casual)
+```
+Remove empty columns, rows and remove NA values all into a new data frame
+```{r Remove empty columns and rows}
+df <- janitor::remove_empty(bike_rides, which = c("cols"))
+df <- janitor::remove_empty(bike_rides, which = c("rows"))
+df <- distinct(bike_rides)
+df<- na.omit(bike_rides)
+```
+View the dimension
+```{r Number of observations and rows}
+dim(df)
+```
+Note: Number of observations is now 4,233,298 (679,774 rows were removed). Now filter the data frame to remove where ride_length is 0 or negative and filter out unnecessary columns.
+```{r Filter out data and create dataframe to work in}
+df <- df %>%
+  filter(minutes>0) %>% 
+    select(-c(ride_id,started_at,ended_at,start_station_id,end_station_name,end_station_id,start_lat,start_lng,end_lat,end_lng))
+
+```
+Note: New data frame is 4,221,509 observations (11,789 additional observations were removed). View the final data frame.
+```{r View new data frame}
+View(df)
+dim(df)
+```
+
+=====================
+# STEP 5. Conduct descriptive analysis
+# =====================
+
+Business task: How do annual members and casual riders use Cyclistic bikes differently?
+
+Casual = customers who purchase single-ride or full-day passes
+
+Members = customers who purchase annual memberships
+
+What date range does our data cover?
+```{r , echo=FALSE}
+min(df$date)
+```
+to
+```{r echo=FALSE}
+max(df$date)
+```
+How many total rides?
+```{r echo=FALSE}
+nrow(df)
+```
+Find the number of rides per month 
+```{r echo=FALSE}
+df %>% 
+group_by(month) %>% 
+   count(year) %>% 
+mutate(
+    month = factor(month, levels = month.name)
+  ) %>%
+  arrange(year,month)
+```
+
+Lets visualize the data.
+
+```{r image one, echo=FALSE}
+df %>% 
+group_by(month) %>% 
+   count(year) %>% 
+mutate(
+    month = factor(month, levels = month.name)
+  ) %>%
+  arrange(year,month) %>% 
+  ggplot(aes(x = month, y = n, fill = month)) +
+  geom_col()+
+  scale_y_continuous(labels=comma)+
+  facet_wrap(~year)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(),axis.text.x=element_text(angle=90),legend.position = "none")+
+   labs(title = "Number of rides per month")
+
+```
+
+Our data covers 12 months, 2020-09-01 to 2021-08-31, that is the end of 2020 to the beginning of 2021. Lets visualize our graph chronologically.
+Image 2
+
+```{r image 2, echo=FALSE}
+df %>% 
+group_by(month) %>% 
+   count(year) %>% 
+mutate(
+    month = factor(month, levels = month.name)
+  ) %>%
+  arrange(year,month) %>% 
+  ggplot(aes(x = month, y = n, fill = month)) +
+  geom_col()+
+  scale_y_continuous(labels=comma)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(),axis.text.x=element_text(angle=90),legend.position = "none")+
+   labs(title = "Number of rides per month")
+```
+
+Viewing the data in chronological order by month makes the data into a bell shape distribution. We can see that the peak of bike rides takes place in the month of July. For sake of this analysis, the season will be as follows.
+```{r image 3, echo=FALSE}
+df %>% 
+  group_by(month,member_casual,season) %>% 
+  count(year) %>% 
+  mutate(
+    month = factor(month, levels = month.name)
+  ) %>%
+  arrange(year,month) %>% 
+  ggplot(aes(x = month, y = n, fill = season)) +
+  geom_col()+
+  scale_y_continuous(labels=comma)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(),axis.text.x=element_text(angle=90),legend.position = "bottom")+
+   labs(title = "Number of rides per season")
+```
+
+The peak months of number of bike rides are in the months of June-August,summer time. We will come back to this time frame. Is there a difference between type of riders and number of rides in the overall data?
+```{r image 4, echo=FALSE}
+df %>% 
+group_by(month,member_casual,season) %>% 
+   count(year) %>% 
+mutate(
+    month = factor(month, levels = month.name)
+  ) %>%
+  arrange(year,month) %>% 
+  ggplot(aes(x = month, y = n, fill = season)) +
+  geom_col()+
+  scale_y_continuous(labels=comma)+
+  facet_wrap(~member_casual)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(),axis.text.x=element_text(angle=90),legend.position = "bottom")+
+   labs(title = "Number of rides per season")
+```
+
+At hindsight we can see the number of bike rides for both member and casual riders are at its highest levels during the summer time (June-August). The total number of rides during summer time is
+```{r echo=FALSE}
+df %>% 
+filter(month == "June"| month == "July"|month == "August") %>% 
+  count() %>% 
+  mutate(prop = n/ nrow(df))
+```
+Around 47 percent of all rides take place during the summer time. Let's focus and continue our analysis in this time frame (June-August). First lets find the total number of riders by type of rider.
+```{r echo=FALSE}
+df %>% 
+filter(month == "June"| month == "July"|month == "August") %>% 
+  count(member_casual) %>% 
+  mutate(prop = n / sum(n))
+```
+During summer time, casual riders tend to out number the member riders. As shown above (Image 2), July was the busiest month with casual riders outnumbering members during July. What are the figures of the type of bicycle used during June-August? 
+
+```{r echo=FALSE}
+df %>% 
+filter(month == "June"| month == "July"|month == "August") %>% 
+  count(rideable_type) %>% 
+  mutate(prop = n / sum(n))
+```
+The most popular bikes during June-August was classic bikes.Users used classic bikes 9.3 more times than docked bikes and 3.8 more times than electric bikes. The individual numbers by month and type of bike are as follows:
+```{r echo=FALSE}
+df %>% 
+filter(month == "June"| month == "July"|month == "August") %>%
+  mutate(
+    month = factor(month, levels = month.name)
+  ) %>% 
+  count(month,rideable_type) %>% 
+  mutate(prop = n / sum(n))
+```
+Lets visualize and lets also consider the type of member utilizing these bikes during the summer.
+```{r image 5, echo=FALSE}
+df %>%
+  filter(month == "June"| month == "July"|month == "August") %>%
+  mutate(
+    month = factor(month, levels = month.name)
+  ) %>% 
+  ggplot(aes(x=member_casual,fill=member_casual), alpha=0.5)+
+  geom_bar()+
+  scale_y_continuous(labels=comma)+
+  facet_grid(month~rideable_type)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.position = "none")+
+  labs(title = "Type of bikes used by customers during June-August", x="Type of rider", y="Number of customers")
+```
+
+As mentioned earlier, users use classic bikes 9.3 more times than docked bikes and 3.8 more times than electric bikes. Classic bikes are favorable regardless of type of rider and summer month. Individual number of graphs are below:
+```{r echo=FALSE}
+df %>% 
+filter(month == "June"| month == "July"|month == "August") %>%
+  mutate(
+    month = factor(month, levels = month.name)
+  ) %>% 
+  count(month,rideable_type,member_casual) %>% 
+  arrange(member_casual)
+```
+
+Lets find the mean, median, max, and min for the ride length (minutes) for customers during summer time.
+```{r echo=FALSE}
+df %>% 
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(Average_ride_length = mean(minutes),min = min(minutes), med = median(minutes), max = max(minutes))
+```
+Between casual riders and members.
+```{r echo=FALSE}
+df %>% 
+  group_by(member_casual) %>% 
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(Average_duration = mean(minutes),min = min(minutes), med = median(minutes), max = max(minutes))
+```
+Not only do casual riders outnumber members they also on average spend longer time riding bicycles than members. What are the average ride length between casual rider and members in a a given day ? (Note: Order the days of the week to make it easy to analyse.)
+
+```{r}
+df$day_of_week <- ordered(df$day_of_week, levels=c("Sunday", "Monday","Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+Find the average minutes spend riding bikes by day of the week between casual riders and members.
+```{r warning = FALSE, echo=FALSE}
+df %>%
+  group_by(member_casual, day_of_week) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(average_duration = mean(minutes)) %>%
+  arrange(member_casual, day_of_week)
+```
+Lets visualize (Note: Visualization is comparing casual riders vs members).
+
+Casual = customers who purchase single-ride or full-day passes
+
+Members = customers who purchase annual memberships
+```{r image 6, warning = FALSE, echo=FALSE}
+df %>%
+  group_by(member_casual, day_of_week) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(average_duration = mean(minutes)) %>%
+  arrange(member_casual, day_of_week) %>%
+  ggplot(aes(x = day_of_week, y = average_duration,fill=member_casual)) +
+  geom_bar(stat='identity', position = 'dodge')+
+  scale_y_continuous(labels=comma)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.position = "bottom")+
+    labs(title = "Average of time spend riding bikes from June-August", x="Day of the week", y="Average bike ride duration")
+```
+
+Is there a change when we filter for type of bike used?
+```{r image 7, warning = FALSE, echo=FALSE}
+df %>%
+  mutate(day_of_week = substr(day_of_week,1,3)) %>%
+  group_by(member_casual, day_of_week,rideable_type) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(average_duration = mean(minutes)) %>%
+  arrange(member_casual, day_of_week,rideable_type) %>%
+  ggplot(aes(x = day_of_week, y = average_duration,fill=member_casual)) +
+  geom_bar(stat='identity', position = 'dodge')+
+  facet_wrap(~rideable_type)+
+  scale_y_continuous(labels=comma)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.position = "bottom")+
+    labs(title = "Average of time spend riding bikes from June-August", x="Day of the week", y="Average bike ride duration")
+```
+
+Look at this. Casual riders on average spend more time riding docked bikes on any given day of the week.
+```{r warning = FALSE, echo=FALSE}
+df %>%
+  group_by(member_casual, rideable_type) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(average_duration = mean(minutes)) %>%
+  arrange(member_casual)
+```
+
+Casual riders spend on average 3.1 times longer riding docked bicycles compared with classic bicycles. We will come back to this. For now lets find the number of rides per day of the week between casual riders and members
+```{r warning = FALSE, echo=FALSE}
+df %>%
+  group_by(member_casual, day_of_week) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(number_of_rides = n(),average_duration = mean(minutes)) %>%
+  arrange(member_casual, day_of_week)
+```
+Visualize the number of rides by rider type
+```{r image 8, warning = FALSE, echo=FALSE}
+df %>%
+  group_by(member_casual, day_of_week) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(number_of_rides = n()) %>%
+  arrange(member_casual, day_of_week) %>%
+  ggplot(aes(x = day_of_week, y = number_of_rides,fill=member_casual)) +
+  geom_bar(stat='identity', position = 'dodge')+
+  scale_y_continuous(labels=comma)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.position = "bottom")+
+  labs(title = "Number of rides by customers from June-August", x="Day of the week", y="Number of rides by day")
+```
+
+Lets see the difference between the number of rider per day by analyzing by type of bike
+```{r image 9, warning = FALSE, echo=FALSE}
+df %>%
+  mutate(day_of_week = substr(day_of_week,1,3)) %>% 
+  group_by(member_casual, day_of_week,rideable_type) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  summarise(number_of_rides = n()) %>%
+  arrange(member_casual, day_of_week) %>%
+  ggplot(aes(x = day_of_week, y = number_of_rides,fill=member_casual)) +
+  geom_bar(stat='identity', position = 'dodge')+
+  facet_wrap(~rideable_type)+
+  scale_y_continuous(labels=comma)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.position = "bottom")+
+  labs(title = "Number of rides by customers from June-August", x="Day of the week", y="Number of rides by day")
+```
+
+Even though casual riders on average spend more time riding docked bikes on any given day of the week, docked bicycles are not used as frequently compared to classic and electric bicycles. 
+```{r echo=FALSE}
+df %>% 
+filter(month == "June"| month == "July"|month == "August") %>% 
+  count(rideable_type,member_casual) %>% 
+  mutate(prop = n / sum(n))
+```
+
+Casual riders use classic bicycles 4.3 more times than docked bicycles. What time during the day do we see the most riders?
+```{r echo=FALSE}
+df %>% 
+  group_by(member_casual) %>% 
+  filter(month == "June"|month == "July"| month == "August") %>%
+  count(hour, sort = T)
+```
+
+Lets visualize
+
+```{r image 10, echo=FALSE}
+df %>% 
+  group_by(member_casual) %>% 
+  filter(month == "June"|month == "July"| month == "August") %>%
+  count(hour, sort = T) %>% 
+  ggplot()+ geom_line(aes(x=hour,y=n,color = member_casual))+
+  scale_y_continuous(labels=comma)+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank())+
+  labs(title="Rush hour",x="Start Hour of Bike rides",y="Number of rides")
+```
+
+Visualize for time of day and during the day of the week between casual riders and members.
+```{r image 11, echo=FALSE}
+  df %>%
+    group_by(member_casual,day_of_week,time_of_day) %>% 
+    filter(month == "June"|month == "July"| month == "August") %>%
+    count(hour, sort = T) %>% 
+    arrange(member_casual, day_of_week) %>% 
+    ggplot()+ geom_line(aes(x=hour,y=n,color = time_of_day))+
+    facet_grid(member_casual~day_of_week)+ 
+    scale_y_continuous(labels=comma)+
+    theme_bw()+
+    theme(panel.grid.major = element_blank(),panel.grid.minor = element_blank(),legend.position = "bottom")
+
+```
+
+The afternoon is the peak time the most riders come on any given day of the week. Casual drivers come most on Saturday and Sunday. Popular Start Stations for Casual riders are:
+```{r warning = FALSE, echo=FALSE}
+df %>%
+  group_by(member_casual,start_station_name) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  dplyr::summarise(number_of_ride = n()) %>%
+  filter(start_station_name != "", "casual" == member_casual) %>%
+  arrange(-number_of_ride) %>%
+  head(n=30) %>%
+  select(-member_casual)
+```
+
+Popular Start Stations for Member riders:
+```{r warning = FALSE, echo=FALSE}
+df %>%
+  group_by(member_casual,start_station_name) %>%
+  filter(month == "June"|month == "July"| month == "August") %>%
+  dplyr::summarise(number_of_ride = n()) %>%
+  filter(start_station_name != "", "member"== member_casual) %>%
+  arrange(-number_of_ride) %>%
+  head(n=30) %>%
+  select(-member_casual)
+````
+
+End of analysis.
+
+Summary:
+
+-I learned that docked bicycle type is on average ridden longer by casual riders. However, casual riders use classic bicycles 4.3 more than docked bicycles. 
+
+-Saturday and Sunday afternoons are the most popular riding days for casual riders.
+
+-November through February have the least number of casual riders while June, July, and August have a particularly high number of Casual riders.
+
+-The most popular stations for Casual riders in descending order are Streeter Dr & Grand Ave, Michigan Ave & Oak St, Millennium Park, Theater on the Lake, Shedd Aquarium.
+
+Recommendations
+
+-Based on the data analyzed I would recommend we focus our marketing efforts for Casual riders with these parameters 
+
+1: Increase marketing for docket bicycles 
+2. Heavier marketing from June through August 
+3. Focus marketing on afternoon weekends 
+4. Invest in marketing at the top 5 stations as noted above.
